@@ -152,6 +152,12 @@ Stored at `~/.config/tasks/config.json`:
 
 ---
 
+## Author
+
+Built by [Ahmed Bouchefra](https://10xdev.blog) — developer, writer, and builder of dev tools.
+
+---
+
 ## License
 
 MIT
