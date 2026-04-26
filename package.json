@@ -1,0 +1,16 @@
+{
+  "name": "@antigravity/tasks",
+  "version": "0.1.0",
+  "description": "Per-project task management with root-level rollup",
+  "type": "module",
+  "bin": {
+    "tasks": "./bin/tasks.js"
+  },
+  "scripts": {
+    "test": "node --test lib/md.test.js"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "chokidar": "^5.0.0"
+  }
+}
