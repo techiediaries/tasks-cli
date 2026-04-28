@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
-import { parseTasks, addTask, markDone, addToDone, addNote, initTodo, initNotes } from '../lib/md.js';
-import { findProjects, todoPath, notesPath, readFile, writeFile } from '../lib/discover.js';
+import { parseTasks, parseNotes, addTask, markDone, addToDone, addNote, initTodo, initNotes } from '../lib/md.js';
+import { findProjects, findGlobalProject, todoPath, notesPath, readFile, writeFile } from '../lib/discover.js';
 import { loadConfig, saveConfig, addRoot, pin, unpin } from '../lib/config.js';
 import { launchTui } from '../lib/tui.js';
 
@@ -70,34 +70,64 @@ function cmdInit(args) {
   }
 }
 
+function printProject(proj) {
+  const content = readFile(todoPath(proj.dir));
+  const notes   = readFile(notesPath(proj.dir));
+  const { current, backlog, done } = content
+    ? parseTasks(content)
+    : { current: [], backlog: [], done: [] };
+  const parsedNotes = notes ? parseNotes(notes) : [];
+
+  const label = proj.isGlobal
+    ? `🌐 Global  (~/TODO.md)`
+    : `📁 ${proj.name}${proj.pinned ? ' 📌' : ''}`;
+  console.log(`\n${label}`);
+
+  if (current.length) {
+    console.log('  Current:');
+    current.forEach(t => console.log(`    [ ] ${t.text}`));
+  }
+  if (backlog.length) {
+    console.log('  Backlog:');
+    backlog.forEach(t => console.log(`    [ ] ${t.text}`));
+  }
+  if (done.length) {
+    console.log('  Done:');
+    done.slice(-5).forEach(t => console.log(`    [x] ${t.text}`));
+  }
+  if (parsedNotes.length) {
+    console.log('  Notes:');
+    parsedNotes.slice(-5).forEach(n => console.log(`    ${n.date}  ${n.text}`));
+  }
+  if (!current.length && !backlog.length && !done.length && !parsedNotes.length)
+    console.log('  (empty)');
+}
+
 function cmdList(args) {
   const { flags, rest } = parseFlags(args);
   if (rest[0]) {
-    const proj = resolveProject(rest[0]);
-    const content = readFile(todoPath(proj.dir));
-    if (!content) return console.log(`${proj.name}: no TODO.md yet.`);
-    const { current, backlog, done } = parseTasks(content);
-    console.log(`\n📁 ${proj.name}${proj.pinned ? ' 📌' : ''}\n`);
-    if (current.length) { console.log('  Current:'); current.forEach(t => console.log(`    [ ] ${t.text}`)); }
-    if (backlog.length) { console.log('  Backlog:'); backlog.forEach(t => console.log(`    [ ] ${t.text}`)); }
-    if (done.length)    { console.log('  Done:');    done.forEach(t => console.log(`    [x] ${t.text}`)); }
-    if (!current.length && !backlog.length && !done.length) console.log('  (empty)');
+    const proj = rest[0] === 'global'
+      ? findGlobalProject()
+      : resolveProject(rest[0]);
+    printProject(proj);
     console.log('');
   } else {
-    const projects = findProjects();
-    if (!projects.length) return console.log('No projects found. Run `tasks init` inside a project directory.');
+    const global   = findGlobalProject();
+    const projects = [global, ...findProjects()];
     console.log('');
     let any = false;
     for (const proj of projects) {
       const content = readFile(todoPath(proj.dir));
-      if (!content) continue;
-      const { current, backlog } = parseTasks(content);
-      if (!current.length && !backlog.length) continue;
+      const notes   = readFile(notesPath(proj.dir));
+      const { current, backlog } = content ? parseTasks(content) : { current: [], backlog: [] };
+      const noteCount = notes ? parseNotes(notes).length : 0;
+      if (!current.length && !backlog.length && !noteCount) continue;
       any = true;
-      const pin   = proj.pinned ? '📌 ' : '   ';
-      const cur   = current.length ? `${current.length} current` : '';
-      const bkl   = backlog.length ? `${backlog.length} backlog` : '';
-      console.log(`  ${pin}${proj.name.padEnd(22)} ${[cur, bkl].filter(Boolean).join(', ')}`);
+      const pinMark = proj.isGlobal ? '🌐 ' : proj.pinned ? '📌 ' : '   ';
+      const cur  = current.length  ? `${current.length} current`  : '';
+      const bkl  = backlog.length  ? `${backlog.length} backlog`  : '';
+      const nts  = noteCount       ? `${noteCount} notes`         : '';
+      console.log(`  ${pinMark}${proj.name.padEnd(22)} ${[cur, bkl, nts].filter(Boolean).join(', ')}`);
       current.forEach(t => console.log(`       [ ] ${t.text}`));
     }
     if (!any) console.log('  Nothing pending.');
