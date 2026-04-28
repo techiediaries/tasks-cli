@@ -176,28 +176,120 @@ function cmdRoot(args) {
 
 function cmdHelp() {
   console.log(`
-  tasks                               rollup of all projects with open tasks
-  tasks ui                            launch interactive TUI (live file watching)
+╔══════════════════════════════════════════════════════════════════╗
+║                        tasks — cheatsheet                        ║
+╚══════════════════════════════════════════════════════════════════╝
+
+OVERVIEW
+  Each project gets a TODO.md with three sections: Current, Backlog, Done.
+  A global ~/TODO.md is always visible in the TUI as the "Global" project.
+  Raw notes go to ~/NOTES.md and appear under Global → Notes in the TUI.
+
+TASK COMMANDS
+  tasks                               list all projects with open tasks
+  tasks ls                            same as above
+  tasks ls <project>                  list tasks for one project
+  tasks add "text" [-p project]       add to Current (active project or -p)
+  tasks backlog "text" [-p project]   add to Backlog
+  tasks bl "text"                     shorthand for backlog
+  tasks done "text" [-p project]      mark a Current task as done
+  tasks note "text" [-p project]      append a timestamped note to NOTES.md
+
+PROJECT MANAGEMENT
   tasks init [dir]                    create TODO.md here (or in [dir])
-  tasks ls [project]                  list tasks for one project or all
-  tasks add "text" [-p project]       add to current tasks
-  tasks backlog "text"                add to backlog
-  tasks done "text"                   mark a task done
-  tasks note "text"                   add a note to NOTES.md
+                                      auto-registers the parent as a root
   tasks pin [project]                 pin project to top of TUI sidebar
   tasks unpin [project]               unpin project
-  tasks root [add] [dir]              manage watched root directories
+  tasks root                          list watched root directories
+  tasks root add [dir]                add a root (default: current dir)
 
-  tasks capture                       open quick-capture popup (hotkey target)
-  tasks daemon [--hotkey ctrl+space]  run hotkey daemon in foreground
+TUI
+  tasks ui                            launch interactive TUI
+  tasks ui help                       show TUI key bindings cheatsheet
+
+QUICK CAPTURE (hotkey popup)
+  tasks capture                       open capture popup directly
+  tasks daemon [--hotkey combo]       run xbindkeys hotkey daemon (foreground)
+                                      default hotkey: control+space
   tasks daemon stop                   stop the running daemon
-  tasks daemon status                 check if daemon is running
-  tasks service install               install + start as a systemd user service
+  tasks daemon status                 show daemon pid / running state
+
+SYSTEMD SERVICE
+  tasks service install [--hotkey c]  install + start as a systemd user service
   tasks service uninstall             remove the systemd service
   tasks service status                show service status
 
-  Inbox (raw captures): ~/.local/share/tasks/inbox.md
-  Daemon log:           ~/.local/share/tasks/daemon.log
+CAPTURE MODES (in the popup, press Tab to cycle)
+  task    →  adds to Current in active project
+  backlog →  adds to Backlog in active project
+  raw     →  adds a timestamped note to ~/NOTES.md (Global → Notes in TUI)
+
+FILES
+  ~/TODO.md                           global task inbox (always in TUI)
+  ~/NOTES.md                          global notes (raw captures land here)
+  <project>/TODO.md                   per-project tasks
+  <project>/NOTES.md                  per-project notes
+  ~/.config/tasks/config.json         roots, pinned projects
+  ~/.config/tasks/hotkey.xbindkeysrc  generated xbindkeys config
+  ~/.local/share/tasks/daemon.pid     daemon pid file
+  ~/.local/share/tasks/daemon.log     daemon / xbindkeys log
+
+EXAMPLES
+  tasks add "write tests for auth module"
+  tasks backlog "refactor payment gateway" -p myapp
+  tasks done "write tests for auth module"
+  tasks note "decided to use JWT over sessions"
+  tasks service install --hotkey "control+space"
+  `);
+}
+
+function cmdUiHelp() {
+  console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║                    tasks ui — key bindings                       ║
+╚══════════════════════════════════════════════════════════════════╝
+
+NAVIGATION
+  j / ↓           move down in project list
+  k / ↑           move up in project list
+  g               jump to top of project list
+  G               jump to bottom of project list
+  scroll          mouse scroll works in the task panel
+
+TASK ACTIONS
+  a               add task → Current (opens inline prompt)
+  b               add task → Backlog (opens inline prompt)
+  d               mark a Current task done (opens picker)
+  m               promote Backlog → Current (opens picker)
+  D               demote Current → Backlog (opens picker)
+  n               add a timestamped note (opens inline prompt)
+
+PROJECT ACTIONS
+  p               toggle pin on selected project
+                  (pinned projects sort to top of sidebar)
+  r               force-refresh all projects and files
+
+GENERAL
+  q / Ctrl+C      quit
+
+PICKER NAVIGATION (when a task picker is open)
+  j / ↓           move down
+  k / ↑           move up
+  Enter           confirm selection
+  Escape / q      cancel and close picker
+
+LAYOUT
+  Left panel      project sidebar (24 cols) — navigate with j/k
+  Right panel     task panel for selected project
+                    ▸ Current   — active tasks
+                    ▸ Backlog   — queued tasks
+                    ▸ Done      — last 10 completed
+                    ▸ Notes     — last 5 notes (if NOTES.md exists)
+  Bottom bar      key binding reminder + last action confirmation
+
+LIVE FILE WATCHING
+  The TUI watches all project directories via chokidar.
+  Editing TODO.md or NOTES.md in another terminal updates the TUI instantly.
   `);
 }
 
@@ -205,7 +297,12 @@ function cmdHelp() {
 
 async function main() {
   switch (cmd) {
-    case 'ui':                  launchTui();        break;
+    case 'ui':
+      if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h')
+        cmdUiHelp();
+      else
+        launchTui();
+      break;
     case 'init':                cmdInit(args);      break;
     case undefined:
     case 'ls':                  cmdList(args);      break;
