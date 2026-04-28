@@ -176,35 +176,85 @@ function cmdRoot(args) {
 
 function cmdHelp() {
   console.log(`
-  tasks                          rollup of all projects with open tasks
-  tasks ui                       launch interactive TUI (live file watching)
-  tasks init [dir]               create TODO.md here (or in [dir])
-  tasks ls [project]             list tasks for one project or all
-  tasks add "text" [-p project]  add to current tasks
-  tasks backlog "text"           add to backlog
-  tasks done "text"              mark a task done
-  tasks note "text"              add a note to NOTES.md
-  tasks pin [project]            pin project to top of TUI sidebar
-  tasks unpin [project]          unpin project
-  tasks root [add] [dir]         manage watched root directories
+  tasks                               rollup of all projects with open tasks
+  tasks ui                            launch interactive TUI (live file watching)
+  tasks init [dir]                    create TODO.md here (or in [dir])
+  tasks ls [project]                  list tasks for one project or all
+  tasks add "text" [-p project]       add to current tasks
+  tasks backlog "text"                add to backlog
+  tasks done "text"                   mark a task done
+  tasks note "text"                   add a note to NOTES.md
+  tasks pin [project]                 pin project to top of TUI sidebar
+  tasks unpin [project]               unpin project
+  tasks root [add] [dir]              manage watched root directories
+
+  tasks capture                       open quick-capture popup (hotkey target)
+  tasks daemon [--hotkey ctrl+space]  run hotkey daemon in foreground
+  tasks daemon stop                   stop the running daemon
+  tasks daemon status                 check if daemon is running
+  tasks service install               install + start as a systemd user service
+  tasks service uninstall             remove the systemd service
+  tasks service status                show service status
+
+  Inbox (raw captures): ~/.local/share/tasks/inbox.md
+  Daemon log:           ~/.local/share/tasks/daemon.log
   `);
 }
 
 // ── dispatch ─────────────────────────────────────────────────────────────────
 
-switch (cmd) {
-  case 'ui':                  launchTui();        break;
-  case 'init':                cmdInit(args);      break;
-  case undefined:
-  case 'ls':                  cmdList(args);      break;
-  case 'add':                 cmdAdd(args);       break;
-  case 'bl':
-  case 'backlog':             cmdBacklog(args);   break;
-  case 'done':                cmdDone(args);      break;
-  case 'note':                cmdNote(args);      break;
-  case 'pin':                 cmdPin(args);       break;
-  case 'unpin':               cmdUnpin(args);     break;
-  case 'root':                cmdRoot(args);      break;
-  case 'help': case '--help': case '-h': cmdHelp(); break;
-  default: die(`Unknown command: ${cmd}. Run \`tasks help\` for usage.`);
+async function main() {
+  switch (cmd) {
+    case 'ui':                  launchTui();        break;
+    case 'init':                cmdInit(args);      break;
+    case undefined:
+    case 'ls':                  cmdList(args);      break;
+    case 'add':                 cmdAdd(args);       break;
+    case 'bl':
+    case 'backlog':             cmdBacklog(args);   break;
+    case 'done':                cmdDone(args);      break;
+    case 'note':                cmdNote(args);      break;
+    case 'pin':                 cmdPin(args);       break;
+    case 'unpin':               cmdUnpin(args);     break;
+    case 'root':                cmdRoot(args);      break;
+    case 'help': case '--help': case '-h': cmdHelp(); break;
+
+    case 'capture': {
+      const { launchCapture } = await import('../lib/capture.js');
+      launchCapture();
+      break;
+    }
+
+    case 'daemon': {
+      const { daemonMain, stopDaemon, isDaemonRunning, getDaemonPid } =
+        await import('../lib/daemon.js');
+      if (args[0] === 'stop') {
+        stopDaemon();
+      } else if (args[0] === 'status') {
+        const running = isDaemonRunning();
+        console.log(running ? `running (pid ${getDaemonPid()})` : 'not running');
+      } else {
+        const hotkeyIdx = args.indexOf('--hotkey');
+        const hotkey    = hotkeyIdx >= 0 ? args[hotkeyIdx + 1] : 'control+space';
+        daemonMain({ hotkey });
+      }
+      break;
+    }
+
+    case 'service': {
+      const { installService, uninstallService, serviceStatus } =
+        await import('../lib/service.js');
+      const hotkeyIdx = args.indexOf('--hotkey');
+      const hotkey    = hotkeyIdx >= 0 ? args[hotkeyIdx + 1] : 'control+space';
+      if (args[0] === 'install')   installService(hotkey);
+      else if (args[0] === 'uninstall') uninstallService();
+      else if (args[0] === 'status')    serviceStatus();
+      else console.log('Usage: tasks service [install|uninstall|status] [--hotkey combo]');
+      break;
+    }
+
+    default: die(`Unknown command: ${cmd}. Run \`tasks help\` for usage.`);
+  }
 }
+
+main();
